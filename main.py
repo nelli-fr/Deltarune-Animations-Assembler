@@ -1,4 +1,5 @@
 import cv2 as cv, os, numpy as np
+from PIL import Image
 
 pngs = []
 
@@ -21,28 +22,6 @@ class Animation:
     def __repr__(self):
         return f"[frames={self.frames}, frameSize={self.frameSize}, firstPx={self.firstPx}]"
 
-
-
-def getFrameSize(mask):
-    """
-    return size in pixels of, for now, first frame
-    """
-    # list of all pixel coordinates that are not in the mask
-    coords = list(zip(np.where(~mask)[0], np.where(~mask)[1]))
-    frames = (~mask).astype(np.uint8)
-
-    # black magic fuckery
-    n, labels, stats, c = cv.connectedComponentsWithStats(frames, connectivity=4)
-
-    # top-left most pixel of the first frame
-    y0, x0 = coords[0]
-    lbl = labels[y0, x0]
-
-    # height, width because ocv likes this format too much
-    return (stats[lbl][3], stats[lbl][2])
-
-
-
 def getAnimation(mask):
     """
     return first frame's pos, frames' size and amount of frames of, for now, first animation
@@ -64,9 +43,9 @@ def getAnimation(mask):
     sizeY = stats[lbl][3]
 
     frameCount = 1
+    # starting from first pixel of the anim, go over it's width +5 px to determine frame count 
     while ~mask[y0+1, x0+1+(sizeX+5)*frameCount]:
         frameCount+=1
-
         
     anim = Animation()
     anim.firstPx = (y0, x0)
@@ -77,7 +56,7 @@ def getAnimation(mask):
 
 
 
-for f in pngs:
+for idx, f in enumerate(pngs):
     img = cv.imread(f.path)
 
     # store all rgb values as a np array
@@ -101,6 +80,7 @@ for f in pngs:
 
     # defining the "frame" color because who knows
     colorL = img[np.where(mask)[0][0], np.where(mask)[1][0]]
+    print(colorL) # [255 134 195]
 
 
     # debug masks
@@ -111,4 +91,24 @@ for f in pngs:
     """
 
     # for noelle-1-4.png should be 47x23, 4 frames, starting at (5, 5) 
-    print(getAnimation(maskD))
+    anim = getAnimation(maskD)
+    frames = []
+    print(anim)
+
+    for i in range(anim.frames):
+        x0 = anim.firstPx[1]+i*(anim.frameSize[1]+5)
+        # crop the image to include only the frame
+        crop = img[anim.firstPx[0]:anim.firstPx[0]+anim.frameSize[0], x0:x0+anim.frameSize[1]]
+        crop = cv.cvtColor(crop, cv.COLOR_BGR2BGRA)
+
+        # mask out the bg color
+        cmask = cv.inRange(crop, crop[0][0], crop[0][0])
+        # remove all pixels out of the inverted mask
+        res = cv.bitwise_and(crop, crop, mask=255-cmask)
+
+        frames.append(Image.fromarray(cv.cvtColor(res, cv.COLOR_BGR2RGBA)))
+
+    if not os.path.exists(f"out/{f.name.split('.')[0]}/"):
+            os.makedirs(f"out/{f.name.split('.')[0]}/")
+    # some pillow magic to compile the frames into a gif
+    frames[0].save(f"out/{f.name.split('.')[0]}/{idx+1}.gif", save_all=True, append_images=frames[1:], duration=83, loop=0, disposal=2)
