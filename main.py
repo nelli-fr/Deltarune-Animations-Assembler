@@ -13,6 +13,16 @@ else:
     print("no `in/` folder")
 
 
+class Animation:
+    def __init__(self):
+        frames = 0
+        frameSize = (0, 0)
+        firstPx = (0, 0)
+    def __repr__(self):
+        return f"[frames={self.frames}, frameSize={self.frameSize}, firstPx={self.firstPx}]"
+
+
+
 def getFrameSize(mask):
     """
     return size in pixels of, for now, first frame
@@ -32,6 +42,41 @@ def getFrameSize(mask):
     return (stats[lbl][3], stats[lbl][2])
 
 
+
+def getAnimation(mask):
+    """
+    return first frame's pos, frames' size and amount of frames of, for now, first animation
+    """
+    # list of all pixel coordinates that are not in the mask
+    coords = list(zip(np.where(~mask)[0], np.where(~mask)[1]))
+    coords2 = list(zip(np.where(mask)[0], np.where(mask)[1]))
+    frames = (~mask).astype(np.uint8)
+
+    # black magic fuckery
+    n, labels, stats, c = cv.connectedComponentsWithStats(frames, connectivity=4)
+
+    # top-left most pixel of the first frame
+    y0, x0 = coords[0]
+    y, x = coords2[0]
+    lbl = labels[y0, x0]
+
+    sizeX = stats[lbl][2]
+    sizeY = stats[lbl][3]
+
+    frameCount = 1
+    while ~mask[y0+1, x0+1+(sizeX+5)*frameCount]:
+        frameCount+=1
+
+        
+    anim = Animation()
+    anim.firstPx = (y0, x0)
+    anim.frameSize = (stats[lbl][3], stats[lbl][2])
+    anim.frames = frameCount
+
+    return anim
+
+
+
 for f in pngs:
     img = cv.imread(f.path)
 
@@ -46,7 +91,7 @@ for f in pngs:
     # 1 darker color for the background and 1 lighter color for the frames' boundaries
 
     # find the darker color of the image
-    # (assuming 1st pixel is the darker color since frames don't touch the edges it seems)
+    # (assuming 1st pixel is the darker color since frames don't touch the edges of the spritesheet it seems)
     colorD = img[0, 0]
     lumD = .114*colorD[0]+.587*colorD[1]+.299*colorD[2]
     maskD = np.all(img==colorD, axis=2)
@@ -65,5 +110,5 @@ for f in pngs:
     cv.destroyAllWindows()
     """
 
-    # should be 47 over 23 for noelle-1-4.png
-    print(getFrameSize(maskD))
+    # for noelle-1-4.png should be 47x23, 4 frames, starting at (5, 5) 
+    print(getAnimation(maskD))
