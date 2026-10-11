@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <title>Deltarune Sprite Assembler</title>
+</head>
+<body>
+    <form id="form">
+        <input name="file" id="file" type="file" accept="image/*" required>
+        <button name="submit" id="submit" type="submit">export animations</button>
+    </form>
+
+    <script>
+        const submit = document.getElementById("submit");
+        const form = document.getElementById("form");
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            try {
+                const res = await fetch("/export", {
+                    method: "POST",
+                    body: new FormData(form)
+                });
+                if(!res.ok) throw new Error(res.status);
+
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = document.getElementById("file").files[0].name.replace(/\.[^.]+$/, "") + ".zip";
+                link.click();
+                URL.revokeObjectURL(url);
+            } catch(error) {
+                console.log(error);
+            }
+        });
+    </script>
+</body>
